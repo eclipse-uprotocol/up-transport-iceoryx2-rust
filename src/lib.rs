@@ -1,5 +1,6 @@
 use async_trait::async_trait;
-use up_rust::{UMessage, UStatus, UTransport};
+use std::sync::Arc;
+use up_rust::{UListener, UMessage, UStatus, UTransport, UUri};
 
 /// This will be the main struct for our uProtocol transport.
 /// It will hold the state necessary to communicate with iceoryx2,
@@ -13,21 +14,26 @@ impl UTransport for Iceoryx2Transport {
         todo!();
     }
 
-    async fn receive(&self) -> Result<UMessage, UStatus> {
-        todo!();
+    async fn register_listener(
+        &self,
+        _source_filter: &UUri,
+        _sink_filter: Option<&UUri>,
+        _listener: Arc<dyn UListener>,
+    ) -> Result<(), UStatus> {
+        todo!()
     }
 
-    async fn register_listener(&self, _listener: Box<dyn Fn(UMessage) + Send + Sync>) -> Result<(), UStatus> {
-        todo!();
-    }
-
-    async fn unregister_listener(&self) -> Result<(), UStatus> {
-        todo!();
+    async fn unregister_listener(
+        &self,
+        _source_filter: &UUri,
+        _sink_filter: Option<&UUri>,
+        _listener: Arc<dyn UListener>,
+    ) -> Result<(), UStatus> {
+        todo!()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
 }
