@@ -9,9 +9,19 @@ pub struct Iceoryx2Transport {}
 // The #[async_trait] attribute enables async functions in our trait impl.
 #[async_trait]
 impl UTransport for Iceoryx2Transport {
-    /// The other trait methods (receive, register_listener, etc.) have
-    /// default implementations, so we only need to provide `send` for now.
     async fn send(&self, _message: UMessage) -> Result<(), UStatus> {
+        todo!();
+    }
+
+    async fn receive(&self) -> Result<UMessage, UStatus> {
+        todo!();
+    }
+
+    async fn register_listener(&self, _listener: Box<dyn Fn(UMessage) + Send + Sync>) -> Result<(), UStatus> {
+        todo!();
+    }
+
+    async fn unregister_listener(&self) -> Result<(), UStatus> {
         todo!();
     }
 }
