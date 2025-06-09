@@ -4,7 +4,6 @@ use up_rust::{UMessage, UStatus, UTransport};
 /// This will be the main struct for our uProtocol transport.
 /// It will hold the state necessary to communicate with iceoryx2,
 /// such as the service connection and active listeners.
-
 pub struct Iceoryx2Transport {}
 
 // The #[async_trait] attribute enables async functions in our trait impl.
