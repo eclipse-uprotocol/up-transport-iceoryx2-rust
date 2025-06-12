@@ -12,6 +12,7 @@
 
 use iceoryx2::prelude::*;
 use up_rust::{UMessage, UStatus, UCode};
+use bytes::Bytes;
 
 #[derive(Debug, Clone, Copy, ZeroCopySend, Default)]
 // optional type name; if not set, `core::any::type_name::<TransmissionData>()` is used
@@ -52,5 +53,10 @@ impl TransmissionData {
             std::ptr::copy_nonoverlapping(ptr, bytes.as_mut_ptr(), bytes.len());
         }
         bytes
+    }
+
+    pub fn from_message(message: &UMessage) -> Result<Self, UStatus> {
+        let payload = message.payload.clone().unwrap_or_default();
+        Self::from_bytes(payload.to_vec())
     }
 }

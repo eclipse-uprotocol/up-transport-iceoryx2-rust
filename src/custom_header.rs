@@ -31,3 +31,15 @@ impl CustomHeader {
     }
 }
 
+
+// In custom_header.rs, add:
+impl CustomHeader {
+    pub fn from_message(message: &UMessage) -> Result<Self, UStatus> {
+        // Extract header information from UMessage
+        Ok(Self {
+            // Set fields based on message.attributes
+            // This is just a placeholder - implement based on your needs
+            ..Default::default()
+        })
+    }
+}
