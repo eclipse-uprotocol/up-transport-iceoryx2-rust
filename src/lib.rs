@@ -2,19 +2,12 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use up_rust::{UListener, UMessage, UStatus, UTransport, UUri, UCode, UAttributes};
 use iceoryx2::prelude::*;
-use protobuf::MessageField;
 
 mod custom_header;
 mod transmission_data;
 pub use custom_header::CustomHeader;
 pub use transmission_data::TransmissionData;
 
-/// This will be the main struct for our uProtocol transport.
-/// It will hold the state necessary to communicate with iceoryx2,
-/// such as the service connection and active listeners.
-
-
-// Channel-based solution - iceoryx2 types are not Send/Sync, so we use channels
 use std::thread;
 
 #[derive(Debug)]
@@ -26,7 +19,6 @@ enum TransportCommand {
     RegisterListener {
         source_filter: UUri,
         sink_filter: Option<UUri>,
-        // Remove Debug requirement by not deriving Debug or handling it manually
         response: std::sync::mpsc::Sender<Result<(), UStatus>>,
     },
     UnregisterListener {
@@ -44,7 +36,6 @@ impl Iceoryx2Transport {
     pub fn new() -> Result<Self, UStatus> {
         let (tx, rx) = std::sync::mpsc::channel();
         
-        // Spawn background thread to handle iceoryx2 operations
         thread::spawn(move || {
             Self::background_task(rx);
         });
@@ -55,9 +46,7 @@ impl Iceoryx2Transport {
     }
     
     fn background_task(rx: std::sync::mpsc::Receiver<TransportCommand>) {
-        // Create iceoryx2 components in the background thread (single-threaded)
-        let node_result = NodeBuilder::new().create::<ipc::Service>();
-        let node = match node_result {
+        let node = match NodeBuilder::new().create::<ipc::Service>() {
             Ok(node) => node,
             Err(e) => {
                 eprintln!("Failed to create iceoryx2 node: {}", e);
@@ -65,13 +54,12 @@ impl Iceoryx2Transport {
             }
         };
 
-        let service_result = node
+        let service = match node
             .service_builder(&"My/Funk/ServiceName".try_into().unwrap())
             .publish_subscribe::<TransmissionData>()
             .user_header::<CustomHeader>()
-            .open_or_create();
-            
-        let service = match service_result {
+            .open_or_create()
+        {
             Ok(service) => service,
             Err(e) => {
                 eprintln!("Failed to create iceoryx2 service: {}", e);
@@ -79,8 +67,7 @@ impl Iceoryx2Transport {
             }
         };
 
-        let publisher_result = service.publisher_builder().create();
-        let publisher = match publisher_result {
+        let publisher = match service.publisher_builder().create() {
             Ok(publisher) => publisher,
             Err(e) => {
                 eprintln!("Failed to create iceoryx2 publisher: {}", e);
@@ -88,7 +75,6 @@ impl Iceoryx2Transport {
             }
         };
         
-        // Process commands
         while let Ok(command) = rx.recv() {
             match command {
                 TransportCommand::Send { message, response } => {
@@ -111,24 +97,15 @@ impl Iceoryx2Transport {
         publisher: &iceoryx2::port::publisher::Publisher<ipc::Service, TransmissionData, CustomHeader>,
         message: UMessage
     ) -> Result<(), UStatus> {
-        // Convert UMessage to TransmissionData
-        let transmission_data = match TransmissionData::from_message(&message) {
-            Ok(data) => data,
-            Err(e) => return Err(e),
-        };
+        let transmission_data = TransmissionData::from_message(&message)?;
         
-        // Create custom header from UMessage attributes
-        let header = match CustomHeader::from_message(&message) {
-            Ok(header) => header,
-            Err(e) => return Err(e),
-        };
+        let header = CustomHeader::from_message(&message)?;
         
-        // Send the message
+        // Loan sample and write payload
         let sample = publisher.loan_uninit()
             .map_err(|e| UStatus::fail_with_code(UCode::INTERNAL, &format!("Failed to loan sample: {e}")))?;
         
-        let sample_final = sample
-            .write_payload(transmission_data);
+        let sample_final = sample.write_payload(transmission_data);
 
         sample_final.send()
             .map_err(|e| UStatus::fail_with_code(UCode::INTERNAL, &format!("Failed to send: {e}")))?;
@@ -137,7 +114,6 @@ impl Iceoryx2Transport {
     }
 }
 
-// The #[async_trait] attribute enables async functions in our trait impl.
 #[async_trait]
 impl UTransport for Iceoryx2Transport {
     async fn send(&self, message: UMessage) -> Result<(), UStatus> {
@@ -199,34 +175,4 @@ impl UTransport for Iceoryx2Transport {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_transport_creation() {
-        // Test that we can create the transport without compilation errors
-        // Note: This might fail at runtime if iceoryx2 daemon isn't running
-        match Iceoryx2Transport::new() {
-            Ok(_transport) => println!("Transport created successfully"),
-            Err(e) => println!("Transport creation failed (expected if daemon not running): {:?}", e),
-        }
-    }
-    
-    // #[tokio::test]
-    // async fn test_send_message() {
-    //     if let Ok(transport) = Iceoryx2Transport::new() {
-    //         // Create a dummy UMessage
-    //         let message = UMessage {
-    //             attributes: MessageField::some(UAttributes::from(&uprotocol_header)),
-    //             payload: Some(vec![1, 2, 3, 4].into()),
-    //             ..Default::default()
-    //         };
-
-    //         // This will fail without iceoryx2 daemon, but should compile
-    //         match transport.send(message).await {
-    //             Ok(_) => println!("Message sent successfully"),
-    //             Err(e) => println!("Send failed (expected without daemon): {:?}", e),
-    //         }
-    //     }
-    // }
-}
+mod test;
