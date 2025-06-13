@@ -37,3 +37,9 @@ impl UTransport for Iceoryx2Transport {
 mod tests {
     use super::*;
 }
+
+#[test]
+fn dummy_fail() {
+    assert_eq!(2 + 2, 5);
+}
+
