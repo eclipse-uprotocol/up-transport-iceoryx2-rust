@@ -34,12 +34,9 @@ impl UTransport for Iceoryx2Transport {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-}
+mod tests {}
 
 #[test]
-fn dummy_fail() {
-    assert_eq!(2 + 2, 5);
+fn dummy_pass() {
+    assert_eq!(2 + 2, 4);
 }
-
