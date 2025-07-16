@@ -7,7 +7,6 @@ use up_rust::{UListener, UMessage, UStatus, UTransport, UUri, UCode};
 /// such as the service connection and active listeners.
 pub struct Iceoryx2Transport {}
 
-// The #[async_trait] attribute enables async functions in our trait impl.
 #[async_trait]
 impl UTransport for Iceoryx2Transport {
     async fn send(&self, _message: UMessage) -> Result<(), UStatus> {
