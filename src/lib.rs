@@ -94,8 +94,6 @@ impl Iceoryx2Transport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use up_rust::{UMessageBuilder, UPayloadFormat};
-
     // fn dummy_uuid() -> up_rust::UUID {
     //     up_rust::UUID::build()
     // }
