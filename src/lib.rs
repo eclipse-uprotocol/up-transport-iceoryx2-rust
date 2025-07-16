@@ -33,6 +33,7 @@ impl UTransport for Iceoryx2Transport {
     }
 }
 
+#[allow(dead_code)]
 impl Iceoryx2Transport {
     fn encode_uuri_segments(uuri: &UUri) -> Vec<String> {
         vec![
@@ -91,7 +92,6 @@ impl Iceoryx2Transport {
 }
 
 #[cfg(test)]
-#[allow(dead_code)]
 mod tests {
     use super::*;
     use up_rust::{UMessageBuilder, UPayloadFormat};
