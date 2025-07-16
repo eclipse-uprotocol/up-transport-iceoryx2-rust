@@ -94,9 +94,6 @@ impl Iceoryx2Transport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    // fn dummy_uuid() -> up_rust::UUID {
-    //     up_rust::UUID::build()
-    // }
 
     fn test_uri(authority: &str, instance: u16, typ: u16, version: u8, resource: u16) -> UUri {
         let entity_id = ((instance as u32) << 16) | (typ as u32);
