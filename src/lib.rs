@@ -72,17 +72,25 @@ impl Iceoryx2Transport {
     
         match Self::determine_message_type(source, sink)? {
             MessageType::RpcRequest => {
-                let segments = Self::encode_uuri_segments(sink.unwrap());
-                Ok(format!("up/{}", join_segments(segments)))
+                if let Some(sink_uri) = sink {
+                    let segments = Self::encode_uuri_segments(sink_uri);
+                    Ok(format!("up/{}", join_segments(segments)))
+                } else {
+                    Err(UStatus::invalid_argument("sink required for RpcRequest"))
+                }
             }
             MessageType::RpcResponseOrNotification => {
-                let source_segments = Self::encode_uuri_segments(source);
-                let sink_segments = Self::encode_uuri_segments(sink.unwrap());
-                Ok(format!(
-                    "up/{}/{}",
-                    join_segments(source_segments),
-                    join_segments(sink_segments)
-                ))
+                if let Some(sink_uri) = sink {
+                    let source_segments = Self::encode_uuri_segments(source);
+                    let sink_segments = Self::encode_uuri_segments(sink_uri);
+                    Ok(format!(
+                        "up/{}/{}",
+                        join_segments(source_segments),
+                        join_segments(sink_segments)
+                    ))
+                } else {
+                    Err(UStatus::invalid_argument("sink required for RpcResponseOrNotification"))
+                }
             }
             MessageType::Publish => {
                 let segments = Self::encode_uuri_segments(source);
@@ -90,7 +98,6 @@ impl Iceoryx2Transport {
             }
         }
     }    
-}
 
 #[cfg(test)]
 mod tests {
