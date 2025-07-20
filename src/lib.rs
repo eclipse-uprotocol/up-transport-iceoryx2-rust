@@ -7,6 +7,12 @@ use up_rust::{UCode, UListener, UMessage, UStatus, UTransport, UUri};
 /// such as the service connection and active listeners.
 pub struct Iceoryx2Transport {}
 
+enum MessageType {
+    RpcRequest,
+    RpcResponseOrNotification,
+    Publish,
+}
+
 // The #[async_trait] attribute enables async functions in our trait impl.
 #[async_trait]
 impl UTransport for Iceoryx2Transport {
@@ -49,42 +55,41 @@ impl Iceoryx2Transport {
         format!("{:X}", value)
     }
 
+    fn determine_message_type(source: &UUri, sink: Option<&UUri>) -> Result<MessageType, UStatus> {
+        match (source.resource_id, sink.map(|s| s.resource_id)) {
+            (0, Some(sink_id)) if (1..=0x7FFF).contains(&sink_id) => Ok(MessageType::RpcRequest),
+            (src_id, Some(0)) if (1..=0xFFFE).contains(&src_id) => Ok(MessageType::RpcResponseOrNotification),
+            (src_id, _) if (1..=0x7FFF).contains(&src_id) => Ok(MessageType::Publish),
+            _ => Err(UStatus::fail_with_code(
+                UCode::INVALID_ARGUMENT,
+                "Unsupported UMessageType",
+            )),
+        }
+    }    
+
     fn compute_service_name(source: &UUri, sink: Option<&UUri>) -> Result<String, UStatus> {
         let join_segments = |segments: Vec<String>| segments.join("/");
-
-        match (source, sink) {
-            // RPC Request: source is a stub (0), sink is a valid method (1..=0x7FFF)
-            (s, Some(sink)) if s.is_rpc_response() && sink.is_rpc_method() => {
-                let segments = Self::encode_uuri_segments(sink);
+    
+        match Self::determine_message_type(source, sink)? {
+            MessageType::RpcRequest => {
+                let segments = Self::encode_uuri_segments(sink.unwrap());
                 Ok(format!("up/{}", join_segments(segments)))
             }
-
-            // Notification or RPC Response: sink is stub (0), source is valid (1..=0xFFFE)
-            (source, Some(sink))
-                if sink.is_rpc_response() && (1..=0xFFFE).contains(&source.resource_id) =>
-            {
+            MessageType::RpcResponseOrNotification => {
                 let source_segments = Self::encode_uuri_segments(source);
-                let sink_segments = Self::encode_uuri_segments(sink);
+                let sink_segments = Self::encode_uuri_segments(sink.unwrap());
                 Ok(format!(
                     "up/{}/{}",
                     join_segments(source_segments),
                     join_segments(sink_segments)
                 ))
             }
-
-            // Publish: source is valid (1..=0x7FFF), sink is None
-            (source, None) if (1..=0x7FFF).contains(&source.resource_id) => {
+            MessageType::Publish => {
                 let segments = Self::encode_uuri_segments(source);
                 Ok(format!("up/{}", join_segments(segments)))
             }
-
-            // Invalid cases
-            _ => Err(UStatus::fail_with_code(
-                UCode::INVALID_ARGUMENT,
-                "Unsupported or invalid UUri combination",
-            )),
         }
-    }
+    }    
 }
 
 #[cfg(test)]
@@ -95,6 +100,8 @@ mod tests {
         let entity_id = ((instance as u32) << 16) | (typ as u32);
         UUri::try_from_parts(authority, entity_id, version, resource).unwrap()
     }
+
+    // performing successful tests for service name computation
 
     #[test]
     // [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="utest"]
@@ -134,13 +141,52 @@ mod tests {
         assert_eq!(name, "up/device1/CD/0/4/B/device1/3AB/4/3/0");
     }
 
+    // performing failing tests for service name computation
+
     #[test]
-    // [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="utest"]
+    // .specitem[dsn~up-attributes-request-source~1]
+    // .specitem[dsn~up-attributes-response-source~1]
+    // .specitem[dsn~up-attributes-notification-source~1]
     fn test_missing_uri_error() {
         let uuri = UUri::new();
         let result = Iceoryx2Transport::compute_service_name(&uuri, None);
 
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().get_code(), UCode::INVALID_ARGUMENT);
+    }
+
+    #[test]
+    //both source and sink have resource ID equal to 0
+    // .specitem[dsn~up-attributes-request-source~1]
+    // .specitem[dsn~up-attributes-request-sink~1]
+    // .specitem[dsn~up-attributes-response-source~1]
+    // .specitem[dsn~up-attributes-response-sink~1]
+    fn test_fail_resource_id_error() {
+        let source = test_uri("device1", 0x0000, 0x00CD, 0x04, 0x000);
+        let sink = test_uri("device1", 0x0004, 0x3AB, 0x3, 0x0000);
+        let result = Iceoryx2Transport::compute_service_name(&source,Some(&sink));
+        assert!(result.is_err_and(|err| err.get_code() == UCode::INVALID_ARGUMENT));
+    }
+    
+    #[test]
+    //source has resource id=0 but missing sink
+    // .specitem[dsn~up-attributes-request-sink~1]
+    // .specitem[dsn~up-attributes-request-source~1]
+    fn test_fail_missing_sink_error() {
+        let source = test_uri("device1", 0x0000, 0x00CD, 0x04, 0x000);
+        let result = Iceoryx2Transport::compute_service_name(&source,None);
+       assert!(result.is_err_and(|err| err.get_code() == UCode::INVALID_ARGUMENT));
+    }
+    
+    #[test]
+    //missing source URI
+    // .specitem[dsn~up-attributes-request-source~1]
+    // .specitem[dsn~up-attributes-response-source~1]
+    // .specitem[dsn~up-attributes-notification-source~1]
+    fn test_fail_missing_source_error() {
+        let uuri = UUri::new();
+        let sink = test_uri("device1", 0x0004, 0x3AB, 0x3, 0x000);
+        let result = Iceoryx2Transport::compute_service_name(&uuri,Some(&sink));
+        assert!(result.is_err_and(|err| err.get_code() == UCode::INVALID_ARGUMENT));
     }
 }
