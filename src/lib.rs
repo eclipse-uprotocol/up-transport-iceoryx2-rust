@@ -141,7 +141,6 @@ mod tests {
         let uuri = UUri::new();
         let result = Iceoryx2Transport::compute_service_name(&uuri, None);
 
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err().get_code(), UCode::INVALID_ARGUMENT);
+        assert!(result.is_err_and(|err| err.get_code() == UCode::INVALID_ARGUMENT));
     }
 }
