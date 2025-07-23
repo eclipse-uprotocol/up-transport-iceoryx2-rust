@@ -97,7 +97,8 @@ impl Iceoryx2Transport {
                 Ok(format!("up/{}", join_segments(segments)))
             }
         }
-    }    
+    } 
+}   
 
 #[cfg(test)]
 mod tests {
