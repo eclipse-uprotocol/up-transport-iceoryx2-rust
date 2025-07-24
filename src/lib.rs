@@ -55,6 +55,11 @@ impl Iceoryx2Transport {
         format!("{:X}", value)
     }
 
+    /// Assumption: valid source and sink URIs provided:
+    /// send() makes use of UAttributesValidator 
+    /// register_listener() and unregister_listener() use verify_filter_criteria() 
+    /// Criteria for identification of message types can be found here: https://github.com/eclipse-uprotocol/up-spec/blob/main/basics/uattributes.adoc
+
     fn determine_message_type(source: &UUri, sink: Option<&UUri>) -> Result<MessageType, UStatus> {
         match (source.resource_id, sink.map(|s| s.resource_id)) {
             (0, Some(sink_id)) if (1..=0x7FFF).contains(&sink_id) => Ok(MessageType::RpcRequest),
@@ -67,6 +72,8 @@ impl Iceoryx2Transport {
         }
     }    
 
+    /// Called in send(), register_listener() and unregister_listener() 
+
     fn compute_service_name(source: &UUri, sink: Option<&UUri>) -> Result<String, UStatus> {
         let join_segments = |segments: Vec<String>| segments.join("/");
     
@@ -76,7 +83,7 @@ impl Iceoryx2Transport {
                     let segments = Self::encode_uuri_segments(sink_uri);
                     Ok(format!("up/{}", join_segments(segments)))
                 } else {
-                    Err(UStatus::invalid_argument("sink required for RpcRequest"))
+                    Err(UStatus::fail("sink required for RpcRequest"))
                 }
             }
             MessageType::RpcResponseOrNotification => {
@@ -89,7 +96,7 @@ impl Iceoryx2Transport {
                         join_segments(sink_segments)
                     ))
                 } else {
-                    Err(UStatus::invalid_argument("sink required for RpcResponseOrNotification"))
+                    Err(UStatus::fail("sink required for RpcResponseOrNotification"))
                 }
             }
             MessageType::Publish => {
