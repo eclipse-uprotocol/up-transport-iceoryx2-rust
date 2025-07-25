@@ -90,7 +90,7 @@ impl Iceoryx2Transport {
         match Self::determine_message_type(source, sink)? {
             MessageType::RpcRequest => {
                 let Some(sink_uri) = sink else {
-                    Err(UStatus::fail_with_code(
+                    return Err(UStatus::fail_with_code(
                         UCode::INVALID_ARGUMENT,
                         "sink required for RpcRequest",
                     ));
