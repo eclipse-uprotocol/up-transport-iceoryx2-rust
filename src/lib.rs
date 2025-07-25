@@ -59,7 +59,6 @@ impl Iceoryx2Transport {
     /// send() makes use of UAttributesValidator
     /// register_listener() and unregister_listener() use verify_filter_criteria()
     /// Criteria for identification of message types can be found here: https://github.com/eclipse-uprotocol/up-spec/blob/main/basics/uattributes.adoc
-
     fn determine_message_type(source: &UUri, sink: Option<&UUri>) -> Result<MessageType, UStatus> {
         let src_id = source.resource_id;
         let sink_id = sink.map(|s| s.resource_id);
