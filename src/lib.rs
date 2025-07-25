@@ -82,7 +82,6 @@ impl Iceoryx2Transport {
     }
 
     /// Called in send(), register_listener() and unregister_listener()
-
     fn compute_service_name(source: &UUri, sink: Option<&UUri>) -> Result<String, UStatus> {
         let join_segments = |segments: Vec<String>| segments.join("/");
 
