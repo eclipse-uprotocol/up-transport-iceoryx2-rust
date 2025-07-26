@@ -80,6 +80,7 @@ impl Iceoryx2Transport {
             "Unsupported UMessageType",
         ))
     }
+    /// Called by send(), register_listener() and unregister_listener()
     fn compute_service_name(source: &UUri, sink: Option<&UUri>) -> Result<String, UStatus> {
         let join_segments = |segments: Vec<String>| segments.join("/");
         // [impl->dsn~up-transport-iceoryx2-service-name~1]
@@ -120,7 +121,8 @@ impl Iceoryx2Transport {
     }
 }
 
-    
+
+   
 
 #[cfg(test)]
 mod tests {
@@ -141,21 +143,24 @@ mod tests {
     }
 
     #[test]
+
     // [utest->dsn~up-transport-iceoryx2-service-name~1]
     fn test_notification_service_name() {
         let source = test_uri("device1", 0x0000, 0x10AB, 0x03, 0x80CD);
         let sink = test_uri("device1", 0x0000, 0x30EF, 0x04, 0x0000);
         let name = Iceoryx2Transport::compute_service_name(&source,Some(&sink)).unwrap();
+
         assert_eq!(name, "up/device1/10AB/0/3/80CD/device1/30EF/0/4/0");
     }
 
     #[test]
+
     // [utest->dsn~up-transport-iceoryx2-service-name~1]
     fn test_rpc_request_service_name() {
         let sink = test_uri("device1", 0x0004, 0x03AB, 0x03, 0x0000);
         let reply_to = test_uri("device1", 0x0000, 0x00CD, 0x04, 0xB);
-
-        let name = Iceoryx2Transport::compute_service_name(&sink,Some(&reply_to)).unwrap();
+        let name = Iceoryx2Transport::compute_service_name(&sink, Some(&reply_to)).unwrap();
+      
         assert_eq!(name, "up/device1/CD/0/4/B");
     }
 
@@ -164,9 +169,8 @@ mod tests {
     fn test_rpc_response_service_name() {
         let source = test_uri("device1", 0x0000, 0x00CD, 0x04, 0xB);
         let sink = test_uri("device1", 0x0004, 0x3AB, 0x3, 0x0000);
-        
-
         let name = Iceoryx2Transport::compute_service_name(&source,Some(&sink)).unwrap();
+      
         assert_eq!(name, "up/device1/CD/0/4/B/device1/3AB/4/3/0");
     }
 
@@ -182,6 +186,7 @@ mod tests {
 
     #[test]
     // [utest->dsn~up-transport-iceoryx2-service-name~1]
+
     fn test_fail_resource_id_error() {
         let source = test_uri("device1", 0x0000, 0x00CD, 0x04, 0x000);
         let sink = test_uri("device1", 0x0004, 0x3AB, 0x3, 0x0000);
@@ -191,6 +196,7 @@ mod tests {
 
     #[test]
     // [utest->dsn~up-transport-iceoryx2-service-name~1]
+
     fn test_fail_missing_source_error() {
         let uuri = UUri::new();
         let sink = test_uri("device1", 0x0004, 0x3AB, 0x3, 0x000);
