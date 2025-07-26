@@ -52,7 +52,7 @@ impl Iceoryx2Transport {
     fn compute_service_name(source: &UUri,sink: Option<&UUri>) -> Result<String, UStatus> {
         let join_segments = |segments: Vec<String>| segments.join("/");
         
-        // [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="impl"]
+        // [impl->dsn~up-transport-iceoryx2-service-name~1]
         // Handle RPC Request: source.resource_id == 0, valid sink (1<=sink.resource_id<=0x7FFF)
         if (source.resource_id==0 )&& !(sink.is_none()){
             if !((1<=sink.unwrap().resource_id && sink.unwrap().resource_id<=0x7FFF)){
