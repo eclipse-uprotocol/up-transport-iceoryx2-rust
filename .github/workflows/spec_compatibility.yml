@@ -26,7 +26,6 @@ jobs:
           cd up-spec
           git checkout main
           git pull
-
       - name: Read .env for OFT config
         uses: xom9ikk/dotenv@v2.3.0
         with:
@@ -49,7 +48,6 @@ jobs:
         run: |
           cargo nextest run --all-features
           cargo test --doc --all-features
-
       - name: Check OpenFastTrace result
         env:
           OFT_EXIT_CODE: ${{ steps.run-oft.outputs.oft-exit-code }}

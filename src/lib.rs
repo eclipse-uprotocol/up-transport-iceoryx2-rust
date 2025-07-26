@@ -61,7 +61,7 @@ impl Iceoryx2Transport {
             let segments = Self::encode_uuri_segments(sink.unwrap());
             Ok(format!("up/{}", join_segments(segments)))
         }
-        // [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="impl"]
+        // [impl->dsn~up-transport-iceoryx2-service-name~1]
         // Handle Notification or RPC Response: sink.resource_id == 0, valid source(1<=source.resource_id<=0xFFFE)
         else if (!(sink.is_none()))&&(sink.unwrap().resource_id==0){
             if 1<=source.resource_id && source.resource_id <=0xFFFE{
@@ -76,7 +76,7 @@ impl Iceoryx2Transport {
             else{
             Err(UStatus::fail_with_code(UCode::INVALID_ARGUMENT, "Invalid sink and source URIs"))}
         }
-        // [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="impl"]
+        // [impl->dsn~up-transport-iceoryx2-service-name~1]
         // Handle Publish: 1 <= source.resource_id <= 0x7FFF
         else if 1<=source.resource_id && source.resource_id<=0x7FFF {
             let segments = Self::encode_uuri_segments(source);
@@ -101,7 +101,7 @@ mod tests {
     }
 
     #[test]
-    // [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="utest"]
+    // [utest->dsn~up-transport-iceoryx2-service-name~1]
     fn test_publish_service_name() {
         let source = test_uri("device1", 0x0000, 0x10AB, 0x03, 0x7FFF);
 
@@ -110,7 +110,7 @@ mod tests {
     }
 
     #[test]
-    // [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="utest"]
+    // [utest->dsn~up-transport-iceoryx2-service-name~1]
     fn test_notification_service_name() {
         let source = test_uri("device1", 0x0000, 0x10AB, 0x03, 0x80CD);
         let sink = test_uri("device1", 0x0000, 0x30EF, 0x04, 0x0000);
@@ -119,7 +119,7 @@ mod tests {
     }
 
     #[test]
-    // [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="utest"]
+    // [utest->dsn~up-transport-iceoryx2-service-name~1]
     fn test_rpc_request_service_name() {
         let sink = test_uri("device1", 0x0004, 0x03AB, 0x03, 0x0000);
         let reply_to = test_uri("device1", 0x0000, 0x00CD, 0x04, 0xB);
@@ -129,7 +129,7 @@ mod tests {
     }
 
     #[test]
-    // [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="utest"]
+    // [utest->dsn~up-transport-iceoryx2-service-name~1]
     fn test_rpc_response_service_name() {
         let source = test_uri("device1", 0x0000, 0x00CD, 0x04, 0xB);
         let sink = test_uri("device1", 0x0004, 0x3AB, 0x3, 0x0000);
@@ -140,7 +140,7 @@ mod tests {
     }
 
     #[test]
-    // [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="utest"]
+    // [utest->dsn~up-transport-iceoryx2-service-name~1]
     fn test_missing_uri_error() {
         let uuri = UUri::new();
         let result = Iceoryx2Transport::compute_service_name(&uuri, None);
