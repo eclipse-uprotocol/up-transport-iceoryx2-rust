@@ -4,6 +4,7 @@ use protobuf::MessageField;
 use std::sync::Arc;
 use up_rust::{UAttributes, UCode, UListener, UMessage, UStatus, UTransport, UUri};
 
+
 mod custom_header;
 pub use custom_header::CustomHeader;
 
@@ -369,6 +370,11 @@ impl Iceoryx2Transport {
     }
 }
 
+pub enum MessageType {
+    RpcRequest,
+    RpcResponseOrNotification,
+    Publish,
+}
 #[async_trait]
 impl UTransport for Iceoryx2Transport {
     async fn send(&self, message: UMessage) -> Result<(), UStatus> {
@@ -439,250 +445,333 @@ impl UTransport for Iceoryx2Transport {
 
 mod receiver;
 
+#[allow(dead_code)]
+impl Iceoryx2Transport {
+    fn encode_uuri_segments(uuri: &UUri) -> Vec<String> {
+        vec![
+            uuri.authority_name.clone(),
+            Self::encode_hex(uuri.uentity_type_id() as u32),
+            Self::encode_hex(uuri.uentity_instance_id() as u32),
+            Self::encode_hex(uuri.uentity_major_version() as u32),
+            Self::encode_hex(uuri.resource_id() as u32),
+        ]
+    }
+
+    fn encode_hex(value: u32) -> String {
+        format!("{:X}", value)
+    }
+
+    fn determine_message_type(source: &UUri, sink: Option<&UUri>) -> Result<MessageType, UStatus> {
+        let src_id = source.resource_id;
+        let sink_id = sink.map(|s| s.resource_id);
+
+        if src_id == 0 {
+            if let Some(id) = sink_id {
+                if id >= 1 && id <= 0x7FFF {
+                    return Ok(MessageType::RpcRequest);
+                }
+            }
+        } else if sink_id == Some(0) && src_id >= 1 && src_id <= 0xFFFE {
+            return Ok(MessageType::RpcResponseOrNotification);
+        } else if src_id >= 1 && src_id <= 0x7FFF {
+            return Ok(MessageType::Publish);
+        }
+
+        Err(UStatus::fail_with_code(
+            UCode::INVALID_ARGUMENT,
+            "Unsupported UMessageType",
+        ))
+    }
+
+    fn compute_service_name(source: &UUri, sink: Option<&UUri>) -> Result<String, UStatus> {
+        let join_segments = |segments: Vec<String>| segments.join("/");
+
+        match Self::determine_message_type(source, sink)? {
+            MessageType::RpcRequest => {
+                let Some(sink_uri) = sink else {
+                    return Err(UStatus::fail_with_code(
+                        UCode::INVALID_ARGUMENT,
+                        "sink required for RpcRequest",
+                    ));
+                };
+                let segments = Self::encode_uuri_segments(sink_uri);
+                Ok(format!("up/{}", join_segments(segments)))
+            }
+            MessageType::RpcResponseOrNotification => {
+                let Some(sink_uri) = sink else {
+                    return Err(UStatus::fail_with_code(
+                        UCode::INVALID_ARGUMENT,
+                        "sink required for ResponseOrNotification",
+                    ));
+                };
+                let source_segments = Self::encode_uuri_segments(source);
+                let sink_segments = Self::encode_uuri_segments(sink_uri);
+                Ok(format!(
+                    "up/{}/{}",
+                    join_segments(source_segments),
+                    join_segments(sink_segments)
+                ))
+            }
+            MessageType::Publish => {
+                let segments = Self::encode_uuri_segments(source);
+                Ok(format!("up/{}", join_segments(segments)))
+            }
+        }
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::time::Duration;
-    use up_rust::{MockUListener, UMessageBuilder, UPayloadFormat};
+  use std::sync::atomic::{AtomicBool, Ordering};
+  use std::time::Duration;
+  use up_rust::{MockUListener, UMessageBuilder, UPayloadFormat};
 
-    fn dummy_uuid() -> up_rust::UUID {
-        up_rust::UUID::build()
-    }
+  fn dummy_uuid() -> up_rust::UUID {
+      up_rust::UUID::build()
+  }
+
 
     fn test_uri(authority: &str, instance: u16, typ: u16, version: u8, resource: u16) -> UUri {
         let entity_id = ((instance as u32) << 16) | (typ as u32);
         UUri::try_from_parts(authority, entity_id, version, resource).unwrap()
     }
 
-    #[test]
-    fn test_publish_service_name() {
-        let source = test_uri("device1", 0x0000, 0x10AB, 0x03, 0x80CD);
-        let message = UMessageBuilder::publish(source.clone())
-            .build_with_payload(vec![], UPayloadFormat::UPAYLOAD_FORMAT_RAW)
-            .unwrap();
+// performing successful tests for service name computation
 
-        let name = Iceoryx2Transport::compute_service_name(&message).unwrap();
-        assert_eq!(name, "up/device1/10AB/0/3/80CD");
-    }
+#[test]
+// [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="utest"]
+fn test_publish_service_name() {
+    let source = test_uri("device1", 0x0000, 0x10AB, 0x03, 0x7FFF);
 
-    #[test]
-    fn test_notification_service_name() {
-        let source = test_uri("device1", 0x0000, 0x10AB, 0x03, 0x80CD);
-        let sink = test_uri("device1", 0x0000, 0x30EF, 0x04, 0x0000);
-        let message = UMessageBuilder::notification(source.clone(), sink.clone())
-            .build_with_payload(vec![], UPayloadFormat::UPAYLOAD_FORMAT_RAW)
-            .unwrap();
+    let name = Iceoryx2Transport::compute_service_name(&source, None).unwrap();
+    assert_eq!(name, "up/device1/10AB/0/3/7FFF");
+}
 
-        let name = Iceoryx2Transport::compute_service_name(&message).unwrap();
+#[test]
+// [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="utest"]
+fn test_notification_service_name() {
+    let source = test_uri("device1", 0x0000, 0x10AB, 0x03, 0x80CD);
+    let sink = test_uri("device1", 0x0000, 0x30EF, 0x04, 0x0000);
+    let name = Iceoryx2Transport::compute_service_name(&source, Some(&sink)).unwrap();
+    assert_eq!(name, "up/device1/10AB/0/3/80CD/device1/30EF/0/4/0");
+}
+
         assert_eq!(name, "up/device1/10AB/0/3/80CD/device1/30EF/0/4/0");
     }
 
     #[test]
-    fn test_rpc_request_service_name() {
-        let sink = test_uri("device1", 0x0000, 0x00CD, 0x04, 0x000B);
-        let reply_to = test_uri("device1", 0x0000, 0x0001, 0x01, 0x0000);
-        let message = UMessageBuilder::request(sink.clone(), reply_to, 1000)
-            .build_with_payload(vec![], UPayloadFormat::UPAYLOAD_FORMAT_RAW)
-            .unwrap();
+// [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="utest"]
+fn test_rpc_request_service_name() {
+    let sink = test_uri("device1", 0x0004, 0x03AB, 0x03, 0x0000);
+    let reply_to = test_uri("device1", 0x0000, 0x00CD, 0x04, 0x000B);
 
-        let name = Iceoryx2Transport::compute_service_name(&message).unwrap();
-        assert_eq!(name, "up/device1/CD/0/4/B");
+    let name = Iceoryx2Transport::compute_service_name(&sink, Some(&reply_to)).unwrap();
+    assert_eq!(name, "up/device1/CD/0/4/B");
+}
+
+
+   #[test]
+// [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="utest"]
+fn test_rpc_response_service_name() {
+    let source = test_uri("device1", 0x0000, 0x00CD, 0x04, 0xB);
+    let sink = test_uri("device1", 0x0004, 0x3AB, 0x3, 0x0000);
+
+    let name = Iceoryx2Transport::compute_service_name(&source, Some(&sink)).unwrap();
+    assert_eq!(name, "up/device1/CD/0/4/B/device1/3AB/4/3/0");
+}
+
+#[test]
+// .specitem[dsn~up-attributes-request-source~1]
+// .specitem[dsn~up-attributes-response-source~1]
+// .specitem[dsn~up-attributes-notification-source~1]
+fn test_missing_uri_error() {
+    let uuri = UUri::new();
+    let result = Iceoryx2Transport::compute_service_name(&uuri, None);
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err().get_code(), UCode::INVALID_ARGUMENT);
+}
+
+#[tokio::test]
+async fn test_register_listener_creates_subscriber() {
+    let transport = Iceoryx2Transport::new().unwrap();
+    let uri = UUri::try_from_parts("vehicle", 0x123, 1, 0x456).unwrap();
+    let listener = Arc::new(MockUListener::new());
+
+    let result = transport
+        .register_listener(&uri, None, listener.clone())
+        .await;
+    assert!(result.is_ok(), "Listener registration should succeed");
+}
+
+#[tokio::test]
+async fn test_register_duplicate_listeners() {
+    let transport = Iceoryx2Transport::new().unwrap();
+    let uri = UUri::try_from_parts("vehicle", 0x123, 1, 0x456).unwrap();
+    let listener1 = Arc::new(MockUListener::new());
+    let listener2 = Arc::new(MockUListener::new());
+
+    let result1 = transport
+        .register_listener(&uri, None, listener1.clone())
+        .await;
+    assert!(result1.is_ok(), "First listener registration should succeed");
+
+    let result2 = transport
+        .register_listener(&uri, None, listener2.clone())
+        .await;
+    assert!(result2.is_ok(), "Second listener registration should succeed");
+}
+
+#[tokio::test]
+async fn test_unregister_listener_cleanup() {
+    let transport = Iceoryx2Transport::new().unwrap();
+    let uri = UUri::try_from_parts("vehicle", 0x123, 1, 0x456).unwrap();
+    let listener = Arc::new(MockUListener::new());
+
+    transport
+        .register_listener(&uri, None, listener.clone())
+        .await
+        .unwrap();
+
+    let result = transport
+        .unregister_listener(&uri, None, listener.clone())
+        .await;
+    assert!(result.is_ok(), "Listener unregistration should succeed");
+}
+
+#[tokio::test]
+async fn test_unregister_nonexistent_listener() {
+    let transport = Iceoryx2Transport::new().unwrap();
+    let uri = UUri::try_from_parts("vehicle", 0x123, 1, 0x456).unwrap();
+    let listener = Arc::new(MockUListener::new());
+
+    let result = transport
+        .unregister_listener(&uri, None, listener.clone())
+        .await;
+    assert!(result.is_ok(), "Unregistering non-existent listener should succeed as no-op");
+}
+
+#[tokio::test]
+async fn test_multiple_unregisters() {
+    let transport = Iceoryx2Transport::new().unwrap();
+    let uri = UUri::try_from_parts("vehicle", 0x123, 1, 0x456).unwrap();
+    let listener = Arc::new(MockUListener::new());
+
+    transport
+        .register_listener(&uri, None, listener.clone())
+        .await
+        .unwrap();
+
+    let result1 = transport
+        .unregister_listener(&uri, None, listener.clone())
+        .await;
+    assert!(result1.is_ok(), "First unregister should succeed");
+
+    let result2 = transport
+        .unregister_listener(&uri, None, listener.clone())
+        .await;
+    assert!(result2.is_ok(), "Second unregister should succeed as no-op");
+}
+
+#[tokio::test]
+async fn test_unregister_cycle() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
+
+    let transport = Iceoryx2Transport::new().unwrap();
+    let uri = UUri::try_from_parts(&format!("vehicle{}", std::process::id()), 0x123, 1, 0x9000)
+        .unwrap();
+
+    struct CountingListener {
+        count: AtomicUsize,
     }
 
-    #[test]
-    fn test_rpc_response_service_name() {
-        let source = test_uri("device1", 0x0001, 0x0020, 0x01, 0x0000);
-        let sink = test_uri("device1", 0x0001, 0x00CD, 0x04, 0x1000);
-        let uuid = dummy_uuid();
-
-        let message = UMessageBuilder::response(source.clone(), uuid, sink.clone())
-            .build_with_payload(vec![], UPayloadFormat::UPAYLOAD_FORMAT_RAW)
-            .unwrap();
-
-        let name = Iceoryx2Transport::compute_service_name(&message).unwrap();
-        assert_eq!(name, "up/device1/CD/1/4/1000/device1/20/1/1/0");
-    }
-
-    #[test]
-    fn test_missing_uri_error() {
-        let message = UMessage::new();
-        let result = Iceoryx2Transport::compute_service_name(&message);
-
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err().get_code(), UCode::INVALID_ARGUMENT);
-    }
-
-    #[tokio::test]
-    async fn test_register_listener_creates_subscriber() {
-        let transport = Iceoryx2Transport::new().unwrap();
-        let uri = UUri::try_from_parts("vehicle", 0x123, 1, 0x456).unwrap();
-        let listener = Arc::new(MockUListener::new());
-
-        // Register listener should succeed
-        let result = transport
-            .register_listener(&uri, None, listener.clone())
-            .await;
-        assert!(result.is_ok(), "Listener registration should succeed");
-    }
-
-    #[tokio::test]
-    async fn test_register_duplicate_listeners() {
-        let transport = Iceoryx2Transport::new().unwrap();
-        let uri = UUri::try_from_parts("vehicle", 0x123, 1, 0x456).unwrap();
-        let listener1 = Arc::new(MockUListener::new());
-        let listener2 = Arc::new(MockUListener::new());
-
-        // Register first listener
-        let result1 = transport
-            .register_listener(&uri, None, listener1.clone())
-            .await;
-        assert!(
-            result1.is_ok(),
-            "First listener registration should succeed"
-        );
-
-        // Register second listener for same URI (should reuse subscriber)
-        let result2 = transport
-            .register_listener(&uri, None, listener2.clone())
-            .await;
-        assert!(
-            result2.is_ok(),
-            "Second listener registration should succeed"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_unregister_listener_cleanup() {
-        let transport = Iceoryx2Transport::new().unwrap();
-        let uri = UUri::try_from_parts("vehicle", 0x123, 1, 0x456).unwrap();
-        let listener = Arc::new(MockUListener::new());
-
-        // Register listener
-        transport
-            .register_listener(&uri, None, listener.clone())
-            .await
-            .unwrap();
-
-        // Unregister listener should succeed
-        let result = transport
-            .unregister_listener(&uri, None, listener.clone())
-            .await;
-        assert!(result.is_ok(), "Listener unregistration should succeed");
-    }
-
-    #[tokio::test]
-    async fn test_unregister_nonexistent_listener() {
-        let transport = Iceoryx2Transport::new().unwrap();
-        let uri = UUri::try_from_parts("vehicle", 0x123, 1, 0x456).unwrap();
-        let listener = Arc::new(MockUListener::new());
-
-        // Unregister non-existent listener should be no-op and succeed
-        let result = transport
-            .unregister_listener(&uri, None, listener.clone())
-            .await;
-        assert!(
-            result.is_ok(),
-            "Unregistering non-existent listener should succeed as no-op"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_multiple_unregisters() {
-        let transport = Iceoryx2Transport::new().unwrap();
-        let uri = UUri::try_from_parts("vehicle", 0x123, 1, 0x456).unwrap();
-        let listener = Arc::new(MockUListener::new());
-
-        // Register listener
-        transport
-            .register_listener(&uri, None, listener.clone())
-            .await
-            .unwrap();
-
-        // First unregister should succeed
-        let result1 = transport
-            .unregister_listener(&uri, None, listener.clone())
-            .await;
-        assert!(result1.is_ok(), "First unregister should succeed");
-
-        // Second unregister should be no-op and succeed
-        let result2 = transport
-            .unregister_listener(&uri, None, listener.clone())
-            .await;
-        assert!(result2.is_ok(), "Second unregister should succeed as no-op");
-    }
-
-    #[tokio::test]
-    async fn test_unregister_cycle() {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-        use std::time::Duration;
-
-        let transport = Iceoryx2Transport::new().unwrap();
-        let uri = UUri::try_from_parts(&format!("vehicle{}", std::process::id()), 0x123, 1, 0x9000)
-            .unwrap();
-
-        struct CountingListener {
-            count: AtomicUsize,
+    #[async_trait::async_trait]
+    impl UListener for CountingListener {
+        async fn on_receive(&self, _msg: UMessage) {
+            self.count.fetch_add(1, Ordering::SeqCst);
         }
+    }
 
-        #[async_trait::async_trait]
-        impl UListener for CountingListener {
-            async fn on_receive(&self, _msg: UMessage) {
-                self.count.fetch_add(1, Ordering::SeqCst);
-            }
-        }
+    let listener = Arc::new(CountingListener {
+        count: AtomicUsize::new(0),
+    });
 
-        let listener = Arc::new(CountingListener {
-            count: AtomicUsize::new(0),
-        });
+    transport
+        .register_listener(&uri, None, listener.clone())
+        .await
+        .unwrap();
 
-        // Register listener
-        transport
-            .register_listener(&uri, None, listener.clone())
-            .await
-            .unwrap();
+    tokio::time::sleep(Duration::from_millis(100)).await;
 
-        // Wait for registration to take effect
-        tokio::time::sleep(Duration::from_millis(100)).await;
+    let message = UMessageBuilder::publish(uri.clone()).build().unwrap();
+    transport.send(message.clone()).await.unwrap();
 
-        // Send a message
-        let message = UMessageBuilder::publish(uri.clone()).build().unwrap();
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let count_before_unregister = listener.count.load(Ordering::SeqCst);
+    assert!(
+        count_before_unregister >= 1,
+        "Should have received at least one message"
+    );
+
+    transport
+        .unregister_listener(&uri, None, listener.clone())
+        .await
+        .unwrap();
+
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    for _ in 0..3 {
         transport.send(message.clone()).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
 
-        // Wait for message processing
-        tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
-        // Record count before unregister
-        let count_before_unregister = listener.count.load(Ordering::SeqCst);
-        assert!(
-            count_before_unregister >= 1,
-            "Should have received at least one message"
-        );
+    let count_after_unregister = listener.count.load(Ordering::SeqCst);
+    assert_eq!(
+        count_before_unregister, count_after_unregister,
+        "Should not receive messages after unregister. Before: {}, After: {}",
+        count_before_unregister, count_after_unregister
+    );
+}
 
-        // Unregister listener
-        transport
-            .unregister_listener(&uri, None, listener.clone())
-            .await
-            .unwrap();
+#[test]
+//both source and sink have resource ID equal to 0
+// .specitem[dsn~up-attributes-request-source~1]
+// .specitem[dsn~up-attributes-request-sink~1]
+// .specitem[dsn~up-attributes-response-source~1]
+// .specitem[dsn~up-attributes-response-sink~1]
+fn test_fail_resource_id_error() {
+    let source = test_uri("device1", 0x0000, 0x00CD, 0x04, 0x000);
+    let sink = test_uri("device1", 0x0004, 0x3AB, 0x3, 0x0000);
+    let result = Iceoryx2Transport::compute_service_name(&source, Some(&sink));
+    assert!(result.is_err_and(|err| err.get_code() == UCode::INVALID_ARGUMENT));
+}
 
-        // Wait for unregister to take effect
-        tokio::time::sleep(Duration::from_millis(200)).await;
+#[test]
+//source has resource id=0 but missing sink
+// .specitem[dsn~up-attributes-request-sink~1]
+// .specitem[dsn~up-attributes-request-source~1]
+fn test_fail_missing_sink_error() {
+    let source = test_uri("device1", 0x0000, 0x00CD, 0x04, 0x000);
+    let result = Iceoryx2Transport::compute_service_name(&source, None);
+    assert!(result.is_err_and(|err| err.get_code() == UCode::INVALID_ARGUMENT));
+}
 
-        // Send more messages after unregister
-        for _ in 0..3 {
-            transport.send(message.clone()).await.unwrap();
-            tokio::time::sleep(Duration::from_millis(50)).await;
-        }
+#[test]
+//missing source URI
+// .specitem[dsn~up-attributes-request-source~1]
+// .specitem[dsn~up-attributes-response-source~1]
+// .specitem[dsn~up-attributes-notification-source~1]
+fn test_fail_missing_source_error() {
+    let uuri = UUri::new();
+    let sink = test_uri("device1", 0x0004, 0x3AB, 0x3, 0x000);
+    let result = Iceoryx2Transport::compute_service_name(&uuri, Some(&sink));
+    assert!(result.is_err_and(|err| err.get_code() == UCode::INVALID_ARGUMENT));
+}
 
-        // Wait to ensure no additional messages are processed
-        tokio::time::sleep(Duration::from_millis(200)).await;
-
-        // Verify no additional messages were received after unregister
-        let count_after_unregister = listener.count.load(Ordering::SeqCst);
-        assert_eq!(
-            count_before_unregister, count_after_unregister,
-            "Should not receive messages after unregister. Before: {}, After: {}",
-            count_before_unregister, count_after_unregister
-        );
     }
 }
