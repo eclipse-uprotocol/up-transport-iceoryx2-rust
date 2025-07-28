@@ -163,7 +163,7 @@ async fn test_unregister_listener_stops_processing_of_messages() {
         .build()
         .expect("failed to build");
 
-    // Register listener
+    // Registers listener
     transport
         .register_listener(&uri, None, listener.clone())
         .await
