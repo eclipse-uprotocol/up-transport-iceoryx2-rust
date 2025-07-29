@@ -1,8 +1,5 @@
 use iceoryx2::prelude::*;
-use iceoryx2_bb_container::{
-    vec::FixedSizeVec,
-    byte_string::FixedSizeByteString,
-};
+use iceoryx2_bb_container::{byte_string::FixedSizeByteString, vec::FixedSizeVec};
 /// A minimal wrapper to hold raw byte payloads for Iceoryx2.
 ///
 /// Iceoryx2 requires payload types to implement ZeroCopySend.

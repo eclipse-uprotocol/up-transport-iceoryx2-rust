@@ -1,10 +1,10 @@
-use std::sync::Arc;
-use tokio::sync::Notify;
 use async_trait::async_trait;
-use up_rust::{UListener, UMessage, UUri, UTransport};
 use env_logger;
-use std::sync::Once;
 use std::str::FromStr;
+use std::sync::Arc;
+use std::sync::Once;
+use tokio::sync::Notify;
+use up_rust::{UListener, UMessage, UTransport, UUri};
 use up_transport_iceoryx2_rust::Iceoryx2Transport;
 
 static INIT_LOGGER: Once = Once::new();
@@ -35,13 +35,14 @@ impl UListener for Receiver {
     }
 }
 
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger();
 
     let notify = Arc::new(Notify::new());
-    let receiver = Arc::new(Receiver { notify: notify.clone() });
+    let receiver = Arc::new(Receiver {
+        notify: notify.clone(),
+    });
 
     let topic = UUri::from_str("//vehicle_shared/10A10B/1/CA5D")?;
     let transport = Iceoryx2Transport::new().unwrap();

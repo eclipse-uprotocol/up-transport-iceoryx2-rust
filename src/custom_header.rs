@@ -24,12 +24,12 @@ impl CustomHeader {
         } else {
             1 // Default version
         };
-        
+
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis() as u64;
-        
+
         Ok(Self { version, timestamp })
     }
 }
@@ -42,14 +42,14 @@ impl From<&CustomHeader> for UAttributes {
 
         // Map CustomHeader fields back to UAttributes using available fields
         // Based on the error message, available fields are: id, type_, source, sink, priority, etc.
-        
+
         // Set default values for required fields
         attrs.type_ = up_rust::UMessageType::UMESSAGE_TYPE_PUBLISH.into();
         attrs.priority = up_rust::UPriority::UPRIORITY_CS4.into();
-        
+
         // Note: version and timestamp information is preserved in the CustomHeader
         // but UAttributes doesn't have direct fields for them, so we use defaults
-        
+
         attrs
     }
 }

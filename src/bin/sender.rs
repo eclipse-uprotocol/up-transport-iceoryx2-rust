@@ -1,8 +1,8 @@
 use env_logger;
-use std::sync::Once;
 use std::str::FromStr;
+use std::sync::Once;
 
-use up_rust::{UMessageBuilder, UPayloadFormat, UUri, UTransport};
+use up_rust::{UMessageBuilder, UPayloadFormat, UTransport, UUri};
 use up_transport_iceoryx2_rust::Iceoryx2Transport;
 
 static INIT_LOGGER: Once = Once::new();
