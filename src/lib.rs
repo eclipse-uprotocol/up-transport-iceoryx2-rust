@@ -303,11 +303,7 @@ impl Iceoryx2Transport {
         sink_filter: Option<&UUri>,
         listener: Arc<dyn UListener>,
     ) -> Result<(), UStatus> {
-        let service_name = match Self::compute_listener_service_name(&source_filter, sink_filter) {
-            Ok(name) => name,
-            Err(e) => {
-                return Err(e);
-            }
+        let service_name = Self::compute_listener_service_name(&source_filter, sink_filter)?;
         };
 
         // Create subscriber if it doesn't exist for this service_name
