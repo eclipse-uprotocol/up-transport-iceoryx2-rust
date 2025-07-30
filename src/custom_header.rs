@@ -1,70 +1,133 @@
 use iceoryx2::prelude::*;
-use up_rust::{UAttributes, UMessage, UStatus};
+use up_rust::{UAttributes, UMessage, UStatus, UCode};
+use iceoryx2_bb_container::vec::FixedSizeVec;
+use protobuf::Message; 
+
+const MAX_FEASIBLE_UATTRIBUTES_SERIALIZED_LENGTH: usize = 1000;
+const UPROTOCOL_MAJOR_VERSION: u8 = 1;
 
 #[derive(Default, Debug, ZeroCopySend)]
 #[type_name("CustomHeader")]
 #[repr(C)]
 pub struct CustomHeader {
-    pub version: i32,
-    pub timestamp: u64,
+    uprotocol_major_version: u8,
+    uattributes_serialized: FixedSizeVec<u8, MAX_FEASIBLE_UATTRIBUTES_SERIALIZED_LENGTH>
 }
 
 impl CustomHeader {
     pub fn from_user_header(header: &Self) -> Result<Self, UStatus> {
         Ok(Self {
-            version: header.version,
-            timestamp: header.timestamp,
+            uprotocol_major_version: header.uprotocol_major_version,
+            uattributes_serialized: header.uattributes_serialized.clone(),
         })
     }
 
     pub fn from_message(message: &UMessage) -> Result<Self, UStatus> {
-        // Extract basic information from UMessage attributes
-        let version = if let Some(_attributes) = &message.attributes.0 {
-            1 // Use a default version for now
-        } else {
-            1 // Default version
-        };
+        let uattributes = message
+            .attributes
+            .as_ref()
+            .ok_or_else(|| UStatus::fail_with_code(UCode::INVALID_ARGUMENT, "Missing attributes"))?;
 
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis() as u64;
+        let serialized = uattributes
+            .write_to_bytes()
+            .map_err(|_| UStatus::fail_with_code(UCode::INTERNAL, "Failed to serialize attributes"))?;
 
-        Ok(Self { version, timestamp })
+        if serialized.len() > MAX_FEASIBLE_UATTRIBUTES_SERIALIZED_LENGTH {
+            return Err(UStatus::fail_with_code(
+                UCode::RESOURCE_EXHAUSTED,
+                "Serialized UAttributes too large for header",
+            ));
+        }
+
+        let mut vec = FixedSizeVec::new();
+        if !vec.extend_from_slice(&serialized) {
+            return Err(UStatus::fail_with_code(
+                UCode::RESOURCE_EXHAUSTED,
+                "Failed to insert serialized data into FixedSizeVec",
+            ));
+        }
+
+        Ok(Self {
+            uprotocol_major_version: UPROTOCOL_MAJOR_VERSION,
+            uattributes_serialized: vec,
+        })
     }
 }
 
-// Assuming UAttributes has a field called `fields` which is Vec<(String, String)>
-// Adjust if your actual UAttributes is different
-impl From<&CustomHeader> for UAttributes {
-    fn from(header: &CustomHeader) -> UAttributes {
-        let mut attrs = UAttributes::default();
+impl TryFrom<&CustomHeader> for UAttributes {
+    type Error = UStatus;
 
-        // Map CustomHeader fields back to UAttributes using available fields
-        // Based on the error message, available fields are: id, type_, source, sink, priority, etc.
-
-        // Set default values for required fields
-        attrs.type_ = up_rust::UMessageType::UMESSAGE_TYPE_PUBLISH.into();
-        attrs.priority = up_rust::UPriority::UPRIORITY_CS4.into();
-
-        // Note: version and timestamp information is preserved in the CustomHeader
-        // but UAttributes doesn't have direct fields for them, so we use defaults
-
-        attrs
+    fn try_from(header: &CustomHeader) -> Result<Self, Self::Error> {
+        let bytes = header.uattributes_serialized.as_slice();
+        protobuf::Message::parse_from_bytes(bytes)
+            .map_err(|_| UStatus::fail_with_code(UCode::INTERNAL, "Failed to parse UAttributes"))
     }
 }
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use up_rust::{UMessageType, UPriority};
+    use protobuf::MessageField;
+
+    fn dummy_uattrs() -> UAttributes {
+        let mut attrs = UAttributes::default();
+        attrs.type_ = UMessageType::UMESSAGE_TYPE_PUBLISH.into();
+        attrs.priority = UPriority::UPRIORITY_CS4.into();
+        attrs
+    }
+
     #[test]
-    fn test_custom_header_from_user_header() {
-        let header = CustomHeader {
-            version: 2,
-            timestamp: 1000,
+    fn test_from_user_header_clones_data() {
+        let mut vec = FixedSizeVec::new();
+        vec.extend_from_slice(&[1, 2, 3]);
+
+        let original = CustomHeader {
+            uprotocol_major_version: 2,
+            uattributes_serialized: vec,
         };
-        let new_header = CustomHeader::from_user_header(&header).unwrap();
-        assert_eq!(new_header.version, 2);
-        assert_eq!(new_header.timestamp, 1000);
+        let cloned = CustomHeader::from_user_header(&original).unwrap();
+        assert_eq!(cloned.uprotocol_major_version, 2);
+        assert_eq!(cloned.uattributes_serialized.as_slice(), &[1, 2, 3]);
+    }
+
+    #[test]
+    fn test_from_message_success() {
+        let attrs = dummy_uattrs();
+        let msg = UMessage {
+            attributes: MessageField::some(attrs.clone()),
+            ..Default::default()
+        };
+
+        let header = CustomHeader::from_message(&msg).unwrap();
+        let deserialized: UAttributes = (&header).try_into().unwrap(); 
+
+        assert_eq!(deserialized.type_, attrs.type_);
+        assert_eq!(deserialized.priority, attrs.priority);
+    }
+
+    #[test]
+    fn test_from_message_fails_on_none() {
+        let msg = UMessage {
+            attributes: MessageField::none(),
+            ..Default::default()
+        };
+        let err = CustomHeader::from_message(&msg).unwrap_err();
+        assert_eq!(err.code, UCode::INVALID_ARGUMENT.into());
+    }
+
+    #[test]
+    fn test_into_uattributes_from_header_roundtrip() {
+        let original = dummy_uattrs();
+        let msg = UMessage {
+            attributes: MessageField::some(original.clone()),
+            ..Default::default()
+        };
+        let header = CustomHeader::from_message(&msg).unwrap();
+        let deserialized: UAttributes = (&header).try_into().unwrap(); 
+
+        assert_eq!(deserialized.type_, original.type_);
+        assert_eq!(deserialized.priority, original.priority);
     }
 }
