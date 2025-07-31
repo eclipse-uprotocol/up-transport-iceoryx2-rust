@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use iceoryx2::prelude::*;
 use protobuf::MessageField;
 use std::sync::Arc;
-use up_rust::{UAttributes, UCode, UMessage, UStatus, UTransport};
+use up_rust::{UAttributes, UCode, UMessage, UStatus, UTransport, UAttributesValidators};
 
 mod custom_header;
 pub use custom_header::CustomHeader;
@@ -172,6 +172,16 @@ impl Iceoryx2Transport {
 #[async_trait]
 impl UTransport for Iceoryx2Transport {
     async fn send(&self, message: UMessage) -> Result<(), UStatus> {
+        let attributes = message.attributes.as_ref().ok_or_else(|| {
+            UStatus::fail_with_code(UCode::INVALID_ARGUMENT, "missing message attributes")
+        })?;
+
+        let validator = UAttributesValidators::get_validator_for_attributes(attributes);
+        if let Err(e) = validator.validate(attributes) {
+            return Err(UStatus::fail_with_code(UCode::INVALID_ARGUMENT, &format!("Invalid message attributes: {}", e),
+        ));
+        }
+
         let (tx, rx) = std::sync::mpsc::channel();
 
         let command = TransportCommand::Send {
