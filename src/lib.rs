@@ -22,18 +22,18 @@ impl UTransport for Iceoryx2Transport {
 
     async fn register_listener(
         &self,
-        _source_filter: &UUri,
-        _sink_filter: Option<&UUri>,
-        _listener: Arc<dyn UListener>,
+        source_filter: &UUri,
+        sink_filter: Option<&UUri>,
+        listener: Arc<dyn UListener>,
     ) -> Result<(), UStatus> {
         todo!()
     }
 
     async fn unregister_listener(
         &self,
-        _source_filter: &UUri,
-        _sink_filter: Option<&UUri>,
-        _listener: Arc<dyn UListener>,
+        source_filter: &UUri,
+        sink_filter: Option<&UUri>,
+        listener: Arc<dyn UListener>,
     ) -> Result<(), UStatus> {
         todo!()
     }

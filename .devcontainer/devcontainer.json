@@ -1,0 +1,86 @@
+// ################################################################################
+// # Copyright (c) 2025 Contributors to the Eclipse Foundation
+// #
+// # See the NOTICE file(s) distributed with this work for additional
+// # information regarding copyright ownership.
+// #
+// # This program and the accompanying materials are made available under the
+// # terms of the Apache License Version 2.0 which is available at
+// # https: //www.apache.org/licenses/LICENSE-2.0
+// #
+// # SPDX-License-Identifier: Apache-2.0
+// ################################################################################
+// 
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/rust
+{
+    "name": "up-transport-iceoryx2-rust",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+        "--privileged"
+    ],
+    "containerEnv": {
+        "WORKSPACE_FOLDER": "${containerWorkspaceFolder}"
+    },
+    "mounts": [
+        {
+            // This is a workaround which is again necessary on MacOS 14.0, it looks like this bug is back:
+            // https://github.com/microsoft/vscode-dev-containers/issues/1487#issuecomment-1143907307
+            "type": "volume",
+            "source": "rust-volume",
+            "target": "/rust-volume"
+        },
+        {
+            "type": "bind",
+            "source": "${localWorkspaceFolder}/.devcontainer/scripts",
+            "target": "/home/vscode/scripts"
+        },
+        {
+            "type": "bind",
+            "source": "${localEnv:HOME}${localEnv:USERPROFILE}/.ssh",
+            "target": "/home/vscode/.ssh"
+        }
+    ],
+    "postCreateCommand": ".devcontainer/scripts/post-create.sh --workspace-folder='${containerWorkspaceFolder}'",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/${localWorkspaceFolderBasename}/,type=bind",
+    "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}/",
+    "remoteUser": "vscode",
+    "customizations": {
+        "vscode": {
+            // Set *default* container specific settings.json values on container create.
+            "settings": {
+                "lldb.executable": "/usr/bin/lldb",
+                // VS Code don't watch files under ./target
+                "files.watcherExclude": {
+                    "**/target/**": true
+                },
+                "rust-analyzer.check.command": "clippy",
+                "rust-analyzer.checkOnSave": true,
+                "coverage-gutters.coverageBaseDir": "**",
+                "coverage-gutters.coverageFileNames": [
+                    "target/tarpaulin/lcov.info"
+                ]
+            },
+            // Add the IDs of extensions you want installed when the container is created.
+            "extensions": [
+                "asciidoctor.asciidoctor-vscode",
+                "bianxianyang.htmlplay",
+                "bierner.markdown-mermaid",
+                "bierner.markdown-preview-github-styles",
+                "davidanson.vscode-markdownlint",
+                "gxl.git-graph-3",
+                "hediet.vscode-drawio",
+                "linusu.auto-dark-mode",
+                "ms-azuretools.vscode-containers",
+                "rust-lang.rust-analyzer",
+                "streetsidesoftware.code-spell-checker",
+                "tamasfe.even-better-toml",
+                "timonwong.shellcheck",
+                "vadimcn.vscode-lldb",
+                "yzhang.markdown-all-in-one"
+            ]
+        }
+    }
+}
