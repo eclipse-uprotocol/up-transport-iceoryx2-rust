@@ -15,13 +15,15 @@ FROM mcr.microsoft.com/devcontainers/rust:latest
 ARG USERNAME=vscode
 ARG TARGETARCH
 
-RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
-    && apt-get -y install \
+RUN apt-get update && \
+    export DEBIAN_FRONTEND=noninteractive && \
+    apt-get -y install \
     curl \
     gcc \
     git \
     openjdk-17-jre \
     zip \
+    libclang-dev \
     && \
     rm -rf /var/lib/apt/lists/*
 
@@ -44,5 +46,3 @@ USER ${USERNAME}
 
 # Install cargo cli tools
 RUN cargo install cargo-nextest cargo-deny cargo-tarpaulin --locked
-RUN sudo apt update && \
-    sudo apt install -y libclang-dev
