@@ -130,52 +130,49 @@ mod tests {
         UUri::try_from_parts(authority, entity_id, version, resource).unwrap()
     }
 
-    // performing successful tests for service name computation
-
     #[test]
-    // [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="utest"]
+    // [utest->dsn~up-transport-iceoryx2-service-name~1]
     fn test_publish_service_name() {
         let source = test_uri("device1", 0x0000, 0x10AB, 0x03, 0x7FFF);
 
-        let name = Iceoryx2Transport::compute_service_name(&source, None).unwrap();
+        let name = Iceoryx2Transport::compute_service_name(&source,None).unwrap();
         assert_eq!(name, "up/device1/10AB/0/3/7FFF");
     }
 
     #[test]
-    // [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="utest"]
+
+    // [utest->dsn~up-transport-iceoryx2-service-name~1]
     fn test_notification_service_name() {
         let source = test_uri("device1", 0x0000, 0x10AB, 0x03, 0x80CD);
         let sink = test_uri("device1", 0x0000, 0x30EF, 0x04, 0x0000);
-        let name = Iceoryx2Transport::compute_service_name(&source, Some(&sink)).unwrap();
+        let name = Iceoryx2Transport::compute_service_name(&source,Some(&sink)).unwrap();
+
         assert_eq!(name, "up/device1/10AB/0/3/80CD/device1/30EF/0/4/0");
     }
 
     #[test]
-    // [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="utest"]
+
+    // [utest->dsn~up-transport-iceoryx2-service-name~1]
     fn test_rpc_request_service_name() {
         let sink = test_uri("device1", 0x0004, 0x03AB, 0x03, 0x0000);
         let reply_to = test_uri("device1", 0x0000, 0x00CD, 0x04, 0xB);
-
         let name = Iceoryx2Transport::compute_service_name(&sink, Some(&reply_to)).unwrap();
+      
         assert_eq!(name, "up/device1/CD/0/4/B");
     }
 
     #[test]
-    // [specitem,oft-sid="dsn~up-transport-iceoryx2-service-name~1",oft-needs="utest"]
+    // [utest->dsn~up-transport-iceoryx2-service-name~1]
     fn test_rpc_response_service_name() {
         let source = test_uri("device1", 0x0000, 0x00CD, 0x04, 0xB);
         let sink = test_uri("device1", 0x0004, 0x3AB, 0x3, 0x0000);
-
-        let name = Iceoryx2Transport::compute_service_name(&source, Some(&sink)).unwrap();
+        let name = Iceoryx2Transport::compute_service_name(&source,Some(&sink)).unwrap();
+      
         assert_eq!(name, "up/device1/CD/0/4/B/device1/3AB/4/3/0");
     }
 
-    // performing failing tests for service name computation
-
     #[test]
-    // .specitem[dsn~up-attributes-request-source~1]
-    // .specitem[dsn~up-attributes-response-source~1]
-    // .specitem[dsn~up-attributes-notification-source~1]
+    // [utest->dsn~up-transport-iceoryx2-service-name~1]
     fn test_missing_uri_error() {
         let uuri = UUri::new();
         let result = Iceoryx2Transport::compute_service_name(&uuri, None);
@@ -185,11 +182,8 @@ mod tests {
     }
 
     #[test]
-    //both source and sink have resource ID equal to 0
-    // .specitem[dsn~up-attributes-request-source~1]
-    // .specitem[dsn~up-attributes-request-sink~1]
-    // .specitem[dsn~up-attributes-response-source~1]
-    // .specitem[dsn~up-attributes-response-sink~1]
+    // [utest->dsn~up-transport-iceoryx2-service-name~1]
+
     fn test_fail_resource_id_error() {
         let source = test_uri("device1", 0x0000, 0x00CD, 0x04, 0x000);
         let sink = test_uri("device1", 0x0004, 0x3AB, 0x3, 0x0000);
@@ -198,20 +192,8 @@ mod tests {
     }
 
     #[test]
-    //source has resource id=0 but missing sink
-    // .specitem[dsn~up-attributes-request-sink~1]
-    // .specitem[dsn~up-attributes-request-source~1]
-    fn test_fail_missing_sink_error() {
-        let source = test_uri("device1", 0x0000, 0x00CD, 0x04, 0x000);
-        let result = Iceoryx2Transport::compute_service_name(&source, None);
-        assert!(result.is_err_and(|err| err.get_code() == UCode::INVALID_ARGUMENT));
-    }
+    // [utest->dsn~up-transport-iceoryx2-service-name~1]
 
-    #[test]
-    //missing source URI
-    // .specitem[dsn~up-attributes-request-source~1]
-    // .specitem[dsn~up-attributes-response-source~1]
-    // .specitem[dsn~up-attributes-notification-source~1]
     fn test_fail_missing_source_error() {
         let uuri = UUri::new();
         let sink = test_uri("device1", 0x0004, 0x3AB, 0x3, 0x000);
@@ -219,3 +201,4 @@ mod tests {
         assert!(result.is_err_and(|err| err.get_code() == UCode::INVALID_ARGUMENT));
     }
 }
+

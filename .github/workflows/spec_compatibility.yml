@@ -1,0 +1,54 @@
+name: OpenFastTrace Validation
+
+on:
+  pull_request:
+  push:
+    branches: 
+      - main
+      - open_fast_trace
+  workflow_dispatch:
+
+env:
+  RUST_TOOLCHAIN: stable
+  RUSTFLAGS: -Dwarnings
+  CARGO_TERM_COLOR: always
+
+jobs:
+  requirements-tracing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+
+      - name: Set up up-spec main branch
+        run: |
+          cd up-spec
+          git checkout main
+          git pull
+      - name: Read .env for OFT config
+        uses: xom9ikk/dotenv@v2.3.0
+        with:
+          mode: "oft-latest"
+          load-mode: strict
+
+      - name: Run OpenFastTrace
+        id: run-oft
+        uses: eclipse-uprotocol/ci-cd/.github/actions/run-oft@main
+        with:
+          file-patterns: "${{ env.OFT_FILE_PATTERNS }}"
+          tags: "${{ env.OFT_TAGS_ }}"
+
+      - uses: dtolnay/rust-toolchain@master
+        with: 
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
+      - name: Run tests
+        run: |
+          cargo nextest run --all-features
+          cargo test --doc --all-features
+      - name: Check OpenFastTrace result
+        env:
+          OFT_EXIT_CODE: ${{ steps.run-oft.outputs.oft-exit-code }}
+        run: exit $OFT_EXIT_CODE
