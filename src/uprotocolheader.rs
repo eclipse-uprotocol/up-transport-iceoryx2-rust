@@ -11,10 +11,16 @@
 // SPDX-License-Identifier: Apache-2.0
 // ################################################################################
 
-pub mod service_name_mapping;
-pub mod transport;
-pub mod types;
-pub mod umessage;
-pub mod uprotocolheader;
-pub mod utransport;
-pub mod workers;
+use iceoryx2::prelude::ZeroCopySend;
+use iceoryx2_bb_container::vec::FixedSizeVec;
+
+const MAX_FEASIBLE_UATTRIBUTES_SERIALIZED_LENGTH: usize = 1000; // choosing ~1000 u8s
+// somewhat arbitrarily
+// this should be confirmed
+
+#[repr(C)]
+#[derive(ZeroCopySend, Debug)]
+pub struct UProtocolHeader {
+    uprotocol_major_version: u8,
+    uattributes_serialized: FixedSizeVec<u8, MAX_FEASIBLE_UATTRIBUTES_SERIALIZED_LENGTH>,
+}

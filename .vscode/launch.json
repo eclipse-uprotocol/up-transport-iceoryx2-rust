@@ -1,0 +1,61 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'up_transport_iceoryx2_rust'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=up-transport-iceoryx2-rust"
+                ],
+                "filter": {
+                    "name": "up_transport_iceoryx2_rust",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'subscriber'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=subscriber",
+                    "--package=up-transport-iceoryx2-rust"
+                ],
+                "filter": {
+                    "name": "subscriber",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'subscriber'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=subscriber",
+                    "--package=up-transport-iceoryx2-rust"
+                ],
+                "filter": {
+                    "name": "subscriber",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
