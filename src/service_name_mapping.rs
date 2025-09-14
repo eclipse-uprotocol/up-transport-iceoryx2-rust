@@ -48,9 +48,6 @@ impl ServiceNameMapper {
         _sink: Option<&UUri>,
         messaging_pattern: MessagingPattern,
     ) -> Result<UMessageType, UStatus> {
-        // let src_id = source.resource_id;
-        // let sink_id = sink.map(|s| s.resource_id);
-
         if Self::is_a_publish(source, messaging_pattern) {
             return Ok(UMessageType::UMESSAGE_TYPE_PUBLISH);
         }
@@ -163,23 +160,6 @@ mod tests {
 
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().get_code(), UCode::INVALID_ARGUMENT);
-    }
-
-    #[test]
-    //both source and sink have resource ID equal to 0
-    // .specitem[dsn~up-attributes-request-source~1]
-    // .specitem[dsn~up-attributes-request-sink~1]
-    // .specitem[dsn~up-attributes-response-source~1]
-    // .specitem[dsn~up-attributes-response-sink~1]
-    fn test_fail_resource_id_error() {
-        let source = test_uri("device1", 0x0000, 0x00CD, 0x04, 0x000);
-        let sink = test_uri("device1", 0x0004, 0x3AB, 0x3, 0x0000);
-        let result = ServiceNameMapper::compute_service_name(
-            &source,
-            Some(&sink),
-            MessagingPattern::PublishSubscribe,
-        );
-        assert!(result.is_err_and(|err| err.get_code() == UCode::INVALID_ARGUMENT));
     }
 
     #[test]

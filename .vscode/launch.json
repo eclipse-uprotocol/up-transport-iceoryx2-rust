@@ -37,25 +37,6 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in example 'subscriber'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--example=subscriber",
-                    "--package=up-transport-iceoryx2-rust"
-                ],
-                "filter": {
-                    "name": "subscriber",
-                    "kind": "example"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
         }
     ]
 }
