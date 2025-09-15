@@ -11,38 +11,27 @@
 // SPDX-License-Identifier: Apache-2.0
 // ################################################################################
 
-use crate::workers::{command::WorkerCommand, dispatcher::Iceoryx2WorkerDispatcher};
-use iceoryx2::node::{Node, NodeBuilder};
-use tokio::{sync::mpsc::Sender, task::JoinHandle};
-use up_rust::UStatus;
+use std::sync::Arc;
 
-pub struct UTransportIceoryx2<Service: iceoryx2::service::Service> {
-    pub(crate) node: Node<Service>,
-}
+use crate::utransport_pubsub::Iceoryx2PubSub;
+use iceoryx2::prelude::MessagingPattern;
+use up_rust::{UCode, UStatus, UTransport};
+
+pub struct UTransportIceoryx2 {}
 
 /// Acts as a uProtocol-specific interface for the Iceoryx2 transport system
-impl<Service: iceoryx2::service::Service> UTransportIceoryx2<Service> {
-    pub fn publish_subscribe() -> (Sender<WorkerCommand>, JoinHandle<Result<(), UStatus>>) {
-        let (command_sender, worker_thread_handle) =
-            Iceoryx2WorkerDispatcher::create_pubsub_worker(1024);
-        (command_sender, worker_thread_handle)
-    }
-
-    pub(crate) fn default() -> Result<UTransportIceoryx2<Service>, UStatus> {
-        let configure_fn: Option<fn(&NodeBuilder)> = None;
-        Self::create(configure_fn)
-    }
-
-    fn create(
-        configure: Option<impl FnOnce(&NodeBuilder)>,
-    ) -> Result<UTransportIceoryx2<Service>, UStatus> {
-        let node_builder = NodeBuilder::new();
-        if let Some(configure) = configure {
-            configure(&node_builder);
+impl UTransportIceoryx2 {
+    pub fn build(messaging_pattern: MessagingPattern) -> Result<Arc<impl UTransport>, UStatus> {
+        match messaging_pattern {
+            MessagingPattern::PublishSubscribe => Ok(UTransportIceoryx2::build_publish_subscribe()),
+            _ => Err(UStatus::fail_with_code(
+                UCode::UNIMPLEMENTED,
+                "Unimplemented messaging pattern",
+            )),
         }
-        let node = node_builder
-            .create::<Service>()
-            .expect("Failed to create Iceoryx2 Node");
-        Ok(UTransportIceoryx2 { node })
+    }
+
+    fn build_publish_subscribe() -> Arc<impl UTransport> {
+        Iceoryx2PubSub::new()
     }
 }

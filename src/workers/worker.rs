@@ -12,35 +12,19 @@
 // ################################################################################
 
 use std::sync::{Arc, atomic::AtomicBool};
-use tokio::sync::{Mutex, mpsc::Receiver};
-use up_rust::{UListener, UMessage, UStatus, UUri};
 
-use crate::workers::command::WorkerCommand;
+use crate::utransport_pubsub::Iceoryx2PubSub;
 
-pub(crate) trait Iceoryx2Worker {
-    // begin UTransport wrapper methods
+pub struct Iceoryx2Worker {
+    pub keep_alive: Arc<AtomicBool>,
+    pub transport: Arc<Iceoryx2PubSub>,
+}
 
-    fn send(&mut self, message: UMessage) -> Result<(), UStatus>;
-
-    fn register_listener(
-        &mut self,
-        source_filter: UUri,
-        sink_filter: Option<UUri>,
-        listener: Arc<dyn UListener>,
-    ) -> Result<(), UStatus>;
-
-    fn unregister_listener(
-        &mut self,
-        source_filter: UUri,
-        sink_filter: Option<UUri>,
-        listener: Arc<dyn UListener>,
-    ) -> Result<(), UStatus>;
-
-    // end UTransport wrapper methods
-
-    fn get_command_receiver(&self) -> Arc<Mutex<Receiver<WorkerCommand>>>;
-
-    fn keep_alive(&self) -> &AtomicBool;
-
-    async fn receive_and_notify_listeners(&self) -> Result<(), UStatus>;
+impl Iceoryx2Worker {
+    pub fn new(transport: Arc<Iceoryx2PubSub>) -> Self {
+        Self {
+            keep_alive: Arc::new(AtomicBool::new(true)),
+            transport,
+        }
+    }
 }

@@ -11,10 +11,34 @@
 // SPDX-License-Identifier: Apache-2.0
 // ################################################################################
 
-pub mod service_name_mapping;
+use iceoryx2::{
+    port::{publisher::Publisher, subscriber::Subscriber},
+    prelude::{ServiceName, ZeroCopySend},
+};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    sync::Arc,
+};
+use tokio::sync::RwLock;
+use up_rust::ComparableListener;
+
+use crate::{umessage::UMessageZeroCopy, uprotocolheader::UProtocolHeader};
+
+pub(crate) mod service_name_mapping;
 pub mod transport;
-pub mod types;
-pub mod umessage;
-pub mod uprotocolheader;
-pub mod utransport;
-pub mod workers;
+pub(crate) mod umessage;
+pub(crate) mod uprotocolheader;
+pub(crate) mod utransport_pubsub;
+pub(crate) mod workers;
+
+pub use iceoryx2::prelude::MessagingPattern;
+
+pub trait BaseUserHeader: Debug + ZeroCopySend {}
+pub trait BasePayload: Debug + ZeroCopySend {}
+
+pub(crate) type PublisherSet<Service> =
+    RwLock<HashMap<ServiceName, Arc<Publisher<Service, UMessageZeroCopy, UProtocolHeader>>>>;
+pub(crate) type SubscriberSet<Service> =
+    RwLock<HashMap<ServiceName, Arc<Subscriber<Service, UMessageZeroCopy, UProtocolHeader>>>>;
+pub(crate) type ListenerMap = RwLock<HashMap<ServiceName, HashSet<ComparableListener>>>;
