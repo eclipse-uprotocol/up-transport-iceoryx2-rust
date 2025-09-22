@@ -11,10 +11,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // ################################################################################
 
-pub mod constants;
-pub mod helpers;
+use std::time::Duration;
 
-#[allow(unused_imports)]
-pub use constants::*;
-#[allow(unused_imports)]
-pub use helpers::*;
+/// The source filter publisher examples will use
+pub static SOURCE_FILTER_STR: &str = "up://device1/10AB/3/80CD";
+
+/// A UMessage will be published at this frequency
+#[allow(dead_code)]
+pub static CYCLE_TIME: Duration = Duration::from_secs(1);

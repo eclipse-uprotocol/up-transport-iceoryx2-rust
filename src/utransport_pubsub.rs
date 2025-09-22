@@ -32,7 +32,6 @@ use crate::{
 
 pub struct Iceoryx2PubSub {
     node: Node<ipc_threadsafe::Service>,
-    listener_worker_runtime: tokio::runtime::Runtime,
     pub publishers: PublisherSet<ipc_threadsafe::Service>,
     pub subscribers: SubscriberSet<ipc_threadsafe::Service>,
     pub listeners: ListenerMap,
@@ -43,28 +42,22 @@ impl Iceoryx2PubSub {
         let node = NodeBuilder::new()
             .create::<ipc_threadsafe::Service>()
             .expect("Failed to create Iceoryx2 Node");
-        let listener_worker_runtime =
-            tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
         let transport = Arc::new(Self {
             node,
             publishers: RwLock::new(HashMap::new()),
             subscribers: RwLock::new(HashMap::new()),
             listeners: RwLock::new(HashMap::new()),
-            listener_worker_runtime,
         });
-        Iceoryx2WorkerDispatcher::start_listener_worker(
-            &transport.listener_worker_runtime,
-            transport.clone(),
-        );
+        Iceoryx2WorkerDispatcher::start_listener_worker(transport.clone());
         transport
     }
 
     pub fn create_subscriber(
         &self,
+        service_name: ServiceName,
     ) -> Result<Subscriber<ipc_threadsafe::Service, UMessageZeroCopy, UProtocolHeader>, UStatus>
     {
         // Placeholder implementation
-        let service_name: ServiceName = "example_service".try_into().unwrap();
         let service = self
             .node
             .service_builder(&service_name)
@@ -85,15 +78,21 @@ impl Iceoryx2PubSub {
         service_name: ServiceName,
     ) -> Result<Arc<Publisher<ipc_threadsafe::Service, UMessageZeroCopy, UProtocolHeader>>, UStatus>
     {
-        let publishers = self.publishers.read().await;
-        if publishers.contains_key(&service_name) {
-            let publisher = publishers.get(&service_name).unwrap();
-            return Ok(publisher.clone());
+        let publisher = self.get_publisher(service_name.clone()).await;
+        if let Some(publisher) = publisher {
+            return Ok(publisher);
         }
-        let service_name_res: Result<ServiceName, _> = service_name.as_str().try_into();
+        self.create_publisher(service_name).await
+    }
+
+    async fn create_publisher(
+        &self,
+        service_name: ServiceName,
+    ) -> Result<Arc<Publisher<ipc_threadsafe::Service, UMessageZeroCopy, UProtocolHeader>>, UStatus>
+    {
         let service = self
             .node
-            .service_builder(&service_name_res.unwrap())
+            .service_builder(&service_name)
             .publish_subscribe::<UMessageZeroCopy>()
             .user_header::<UProtocolHeader>()
             .open_or_create()
@@ -110,17 +109,21 @@ impl Iceoryx2PubSub {
         Ok(publisher.clone())
     }
 
+    async fn get_publisher(
+        &self,
+        service_name: ServiceName,
+    ) -> Option<Arc<Publisher<ipc_threadsafe::Service, UMessageZeroCopy, UProtocolHeader>>> {
+        let publishers = self.publishers.read().await;
+        if publishers.contains_key(&service_name) {
+            let publisher = publishers.get(&service_name).unwrap();
+            return Some(publisher.clone());
+        }
+        None
+    }
+
     pub async fn relay(&self) -> Result<(), UStatus> {
-        let current_thread_runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|e| {
-                UStatus::fail_with_code(
-                    UCode::INTERNAL,
-                    format!("Failed to build current_thread runtime: {e}"),
-                )
-            })?;
-        for (service_name, subscriber) in self.subscribers.read().await.iter() {
+        let subscribers = self.subscribers.read().await;
+        for (service_name, subscriber) in subscribers.iter() {
             match subscriber.receive() {
                 Ok(Some(sample)) => {
                     let payload = sample;
@@ -128,7 +131,8 @@ impl Iceoryx2PubSub {
                     {
                         for listener in listeners_to_notify.iter() {
                             let listener: &ComparableListener = listener;
-                            current_thread_runtime.block_on(listener.on_receive(payload.0.clone()));
+                            let payload_clone = payload.0.clone();
+                            listener.on_receive(payload_clone).await;
                         }
                     }
                 }
@@ -182,14 +186,17 @@ impl UTransport for Iceoryx2PubSub {
     ) -> Result<(), UStatus> {
         up_rust::verify_filter_criteria(source_filter, sink_filter)?;
         let service_name = compute_service_name(
-            &source_filter,
+            source_filter,
             sink_filter,
             MessagingPattern::PublishSubscribe,
         )?;
-        let subscribers = self.subscribers.read().await;
+        let has_subscriber = {
+            let subscribers = self.subscribers.read().await;
+            subscribers.contains_key(&service_name)
+        };
         // insert subscriber for service name if it does not already exist
-        if !subscribers.contains_key(&service_name) {
-            let subscriber = self.create_subscriber()?;
+        if !has_subscriber {
+            let subscriber = self.create_subscriber(service_name.clone())?;
             let mut subscribers = self.subscribers.write().await;
             subscribers.insert(service_name.clone(), Arc::new(subscriber));
         }
@@ -212,7 +219,7 @@ impl UTransport for Iceoryx2PubSub {
     ) -> Result<(), UStatus> {
         up_rust::verify_filter_criteria(source_filter, sink_filter)?;
         let service_name = compute_service_name(
-            &source_filter,
+            source_filter,
             sink_filter,
             MessagingPattern::PublishSubscribe,
         )?;

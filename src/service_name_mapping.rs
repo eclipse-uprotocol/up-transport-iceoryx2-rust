@@ -55,7 +55,7 @@ fn determine_message_type(
 }
 
 fn is_a_publish(source: &UUri, messaging_pattern: MessagingPattern) -> bool {
-    source.is_empty() == false && messaging_pattern == MessagingPattern::PublishSubscribe
+    !source.is_empty() && messaging_pattern == MessagingPattern::PublishSubscribe
 }
 
 pub fn compute_service_name(

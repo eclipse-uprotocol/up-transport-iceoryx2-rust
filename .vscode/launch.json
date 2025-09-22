@@ -37,6 +37,24 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'publisher'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=publisher",
+                    "--package=up-transport-iceoryx2-rust"
+                ],
+                "filter": {
+                    "name": "publisher",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
         }
     ]
 }

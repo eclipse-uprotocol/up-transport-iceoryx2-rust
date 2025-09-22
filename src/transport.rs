@@ -31,7 +31,7 @@ impl UTransportIceoryx2 {
         }
     }
 
-    fn build_publish_subscribe() -> Arc<impl UTransport> {
+    fn build_publish_subscribe() -> Arc<Iceoryx2PubSub> {
         Iceoryx2PubSub::new()
     }
 }

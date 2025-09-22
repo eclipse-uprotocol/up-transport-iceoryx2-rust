@@ -12,7 +12,6 @@
 // ################################################################################
 
 use std::sync::{Arc, atomic::Ordering};
-use tokio::runtime::Runtime;
 use up_rust::UStatus;
 
 use crate::{utransport_pubsub::Iceoryx2PubSub, workers::worker::Iceoryx2Worker};
@@ -20,10 +19,9 @@ use crate::{utransport_pubsub::Iceoryx2PubSub, workers::worker::Iceoryx2Worker};
 pub struct Iceoryx2WorkerDispatcher {}
 
 impl Iceoryx2WorkerDispatcher {
-    pub fn start_listener_worker(runtime: &Runtime, transport: Arc<Iceoryx2PubSub>) {
+    pub fn start_listener_worker(transport: Arc<Iceoryx2PubSub>) {
         let worker = Iceoryx2Worker::new(transport.clone());
-        let future = Iceoryx2WorkerDispatcher::run(worker);
-        runtime.spawn(future);
+        tokio::spawn(async { Iceoryx2WorkerDispatcher::run(worker).await });
     }
 
     async fn run(worker: Iceoryx2Worker) -> Result<(), UStatus> {
