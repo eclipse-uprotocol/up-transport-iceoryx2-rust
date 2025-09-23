@@ -19,13 +19,16 @@ use up_transport_iceoryx2_rust::{MessagingPattern, transport::UTransportIceoryx2
 mod common;
 use crate::common::*;
 
-struct SubscriberListener;
+struct ConsolePrinter;
 
 #[async_trait]
-impl UListener for SubscriberListener {
-    /// Spawns a task to process the received message. In this example, we simply print the message contents.
-    async fn on_receive(&self, msg: UMessage) {
-        print_umessage(&msg);
+impl UListener for ConsolePrinter {
+    async fn on_receive(&self, message: UMessage) {
+        let payload_memory_address = message.payload.as_ref().unwrap();
+        println!("Received a message!");
+        print_umessage(&message);
+        println!("Payload Memory address: {payload_memory_address:p}");
+        println!();
     }
 }
 
@@ -34,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("uProtocol UTransportIceoryx2 subscriber example");
     let source_filter = UUri::from_str(SOURCE_FILTER_STR).expect("Failed to create source UUri");
     let transport = UTransportIceoryx2::build(MessagingPattern::PublishSubscribe)?;
-    let ulistener = Arc::new(SubscriberListener);
+    let ulistener = Arc::new(ConsolePrinter);
     transport
         .register_listener(&source_filter, None, ulistener)
         .await?;

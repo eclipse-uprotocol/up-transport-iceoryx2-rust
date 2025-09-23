@@ -127,11 +127,17 @@ impl Iceoryx2PubSub {
             match subscriber.receive() {
                 Ok(Some(sample)) => {
                     let payload = sample;
+                    let umessage = payload.to_umessage().map_err(|e| {
+                        UStatus::fail_with_code(
+                            UCode::INTERNAL,
+                            format!("Failed to deserialize UMessage: {}", e),
+                        )
+                    })?;
                     if let Some(listeners_to_notify) = self.listeners.read().await.get(service_name)
                     {
                         for listener in listeners_to_notify.iter() {
                             let listener: &ComparableListener = listener;
-                            let payload_clone = payload.0.clone();
+                            let payload_clone = umessage.clone();
                             listener.on_receive(payload_clone).await;
                         }
                     }
@@ -171,7 +177,13 @@ impl UTransport for Iceoryx2PubSub {
         let sample = publisher.loan_uninit().map_err(|e| {
             UStatus::fail_with_code(UCode::INTERNAL, format!("Failed to loan sample: {e}"))
         })?;
-        let sample_final = sample.write_payload(UMessageZeroCopy(message));
+        let zero_copy_message = UMessageZeroCopy::new(message).map_err(|e| {
+            UStatus::fail_with_code(
+                UCode::INTERNAL,
+                format!("Failed to create zero-copy message: {}", e),
+            )
+        })?;
+        let sample_final = sample.write_payload(zero_copy_message);
         sample_final.send().map_err(|e| {
             UStatus::fail_with_code(UCode::INTERNAL, format!("Failed to send: {e}"))
         })?;

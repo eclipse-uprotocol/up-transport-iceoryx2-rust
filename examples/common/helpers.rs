@@ -18,7 +18,6 @@ use up_rust::UMessage;
 pub fn print_umessage(msg: &UMessage) {
     let payload_utf8 = msg.payload.as_ref().map(|p| String::from_utf8_lossy(p));
     let (source_uri, sink_uri) = get_source_and_sink_uri(msg);
-    println!("Received a message!");
     println!("Source Uri: {source_uri:?}");
     println!("Sink Uri: {sink_uri:?}");
     println!("Payload: {payload_utf8:?}");
