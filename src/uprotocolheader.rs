@@ -14,13 +14,12 @@
 use iceoryx2::prelude::ZeroCopySend;
 use iceoryx2_bb_container::vec::FixedSizeVec;
 
-const MAX_FEASIBLE_UATTRIBUTES_SERIALIZED_LENGTH: usize = 1000; // choosing ~1000 u8s
-// somewhat arbitrarily
-// this should be confirmed
+pub const MAX_FEASIBLE_UATTRIBUTES_SERIALIZED_LENGTH: usize = 1000;
 
+/// Also see [uAttributes Mapping to iceoryx2 user header](https://github.com/eclipse-uprotocol/up-spec/blob/0cc43c8afb7d7cbd3169ffe093be761c57308cef/up-l1/iceoryx2.adoc#411-uattributes-mapping-to-iceoryx2-user-header)
 #[repr(C)]
 #[derive(ZeroCopySend, Debug, Default)]
 pub struct UProtocolHeader {
-    uprotocol_major_version: u8,
-    uattributes_serialized: FixedSizeVec<u8, MAX_FEASIBLE_UATTRIBUTES_SERIALIZED_LENGTH>,
+    pub(crate) uprotocol_major_version: u8,
+    pub(crate) uattributes_serialized: FixedSizeVec<u8, MAX_FEASIBLE_UATTRIBUTES_SERIALIZED_LENGTH>,
 }

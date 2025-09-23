@@ -11,6 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // ################################################################################
 
+pub const UPROTOCOL_MAJOR_VERSION: u8 = 0;
+
 use iceoryx2::{
     port::{publisher::Publisher, subscriber::Subscriber},
     prelude::{ServiceName, ZeroCopySend},
@@ -23,11 +25,10 @@ use std::{
 use tokio::sync::RwLock;
 use up_rust::ComparableListener;
 
-use crate::{umessage::UMessageZeroCopy, uprotocolheader::UProtocolHeader};
+use crate::uprotocolheader::UProtocolHeader;
 
 pub(crate) mod service_name_mapping;
 pub mod transport;
-pub(crate) mod umessage;
 pub(crate) mod uprotocolheader;
 pub(crate) mod utransport_pubsub;
 pub(crate) mod workers;
@@ -38,7 +39,7 @@ pub trait BaseUserHeader: Debug + ZeroCopySend {}
 pub trait BasePayload: Debug + ZeroCopySend {}
 
 pub(crate) type PublisherSet<Service> =
-    RwLock<HashMap<ServiceName, Arc<Publisher<Service, UMessageZeroCopy, UProtocolHeader>>>>;
+    RwLock<HashMap<ServiceName, Arc<Publisher<Service, [u8], UProtocolHeader>>>>;
 pub(crate) type SubscriberSet<Service> =
-    RwLock<HashMap<ServiceName, Arc<Subscriber<Service, UMessageZeroCopy, UProtocolHeader>>>>;
+    RwLock<HashMap<ServiceName, Arc<Subscriber<Service, [u8], UProtocolHeader>>>>;
 pub(crate) type ListenerMap = RwLock<HashMap<ServiceName, HashSet<ComparableListener>>>;

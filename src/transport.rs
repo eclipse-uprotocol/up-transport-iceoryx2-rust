@@ -19,7 +19,6 @@ use up_rust::{UCode, UStatus, UTransport};
 
 pub struct UTransportIceoryx2 {}
 
-/// Acts as a uProtocol-specific interface for the Iceoryx2 transport system
 impl UTransportIceoryx2 {
     pub fn build(messaging_pattern: MessagingPattern) -> Result<Arc<impl UTransport>, UStatus> {
         match messaging_pattern {
