@@ -35,6 +35,7 @@ Workspace Folder       ${SECONDARY_COLOR}$WORKSPACE_FOLDER
 ${INFO_COLOR}Library Version(s)${PRIMARY_COLOR}
 Rust Version           ${SECONDARY_COLOR}$(rustc --version)${PRIMARY_COLOR}
 Cargo Version          ${SECONDARY_COLOR}$(cargo --version)${PRIMARY_COLOR}
+Java Version           ${SECONDARY_COLOR}$(java --version)${PRIMARY_COLOR}
 
 ${INFO_COLOR}Git${PRIMARY_COLOR}
 Username               ${SECONDARY_COLOR}$(git config user.name)${PRIMARY_COLOR}
